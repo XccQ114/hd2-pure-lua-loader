@@ -6,7 +6,9 @@
 
 一个面向当前 Steam 构建（**25988413**）的《绝地潜兵 2》（HELLDIVERS 2）**纯 Lua Mod Loader**。它通过覆盖 `boot` 资源，把 `<game>\mods\` 下的 mod 加载进游戏**自己的 Lua 5.1 状态**里——不需要 native DLL、不需要代码签名、不碰反作弊、也不依赖 Bingus Shared Loader。
 
-> **状态：0.2.0 —— 两种部署形态均已在游戏内验证通过。** 在构建 25988413 上端到端验证了两种配置：**solo**（loader 单独构成整个 `boot` payload）与 **merge**（追加在第三方 host payload，例如 ArmoryForge 之后）。两种情况下，一个为 Bingus Shared Loader 编写的真实第三方 mod（shock233 的 P2P Ping）都被加载并在屏幕上画出了 HUD。实测证据（含**做不到**的部分）见 [docs/COMPATIBILITY.zh-CN.md](docs/COMPATIBILITY.zh-CN.md)。
+> **状态：0.2.2 —— 两种部署形态均已在游戏内验证通过。** 在构建 25988413 上端到端验证了两种配置：**solo**（loader 单独构成整个 `boot` payload）与 **merge**（追加在第三方 host payload，例如 ArmoryForge 之后）。两种情况下，一个为 Bingus Shared Loader 编写的真实第三方 mod（shock233 的 P2P Ping）都被加载并画出了 HUD，随包附带的 `examples/hud-panel` 也连续绘制正常。实测证据（含**做不到**的部分）见 [docs/COMPATIBILITY.zh-CN.md](docs/COMPATIBILITY.zh-CN.md)。
+>
+> 首发之后有三个修复值得知道，见 [CHANGELOG.zh-CN.md](CHANGELOG.zh-CN.md)：可被绕过的沙箱写入规则（0.2.1）、以及因 `Gui.resolution` 传参而引发的可复现崩溃（0.2.2）。
 
 ---
 

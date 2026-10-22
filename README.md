@@ -6,11 +6,14 @@ A **pure-Lua mod loader** for HELLDIVERS 2 on the current Steam build (**2598841
 `<game>\mods\` into the game's own Lua 5.1 state through a `boot` resource override — no native DLL, no code
 signature, no anti-cheat interaction, no Bingus Shared Loader.
 
-> **Status: 0.2.0 — proven in both deployment modes.** Verified end-to-end on build 25988413 in two configurations:
+> **Status: 0.2.2 — proven in both deployment modes.** Verified end-to-end on build 25988413 in two configurations:
 > **solo** (the loader alone is the whole `boot` payload) and **merged** (appended to a third-party host payload such
 > as ArmoryForge). In both, a real third-party mod written for Bingus Shared Loader (P2P Ping by shock233) loaded and
-> drew its HUD on screen. See [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) for measured evidence, including what
-> does **not** work.
+> drew its HUD, and the bundled `examples/hud-panel` drew continuously. See
+> [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) for measured evidence, including what does **not** work.
+>
+> Three fixes since the first release are worth knowing about — see [CHANGELOG.md](CHANGELOG.md): a bypassable sandbox
+> write rule (0.2.1), and a reproducible crash caused by calling `Gui.resolution` with an argument (0.2.2).
 
 ---
 
