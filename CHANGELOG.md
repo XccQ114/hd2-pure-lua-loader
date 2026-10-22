@@ -2,6 +2,41 @@
 
 All notable changes to this project. Dates are local (UTC+8) unless noted.
 
+`update` is not in this changelog? It is: 0.2.1 is the sandbox fix, 0.2.0 the four-hook fix, 0.1.0 the first release.
+
+## 0.2.1 — 2026-10-23
+
+### Security / correctness — the mod sandbox write rule was bypassable
+
+The `io.open` guard for write modes accepted any path *containing* the text `mods`, as a substring. Measured bypasses:
+
+| path | old verdict | what it actually resolved to |
+|---|---|---|
+| `mods\..\..\evil.txt` | allowed | the game root (two levels up) |
+| `mods\..\evil.txt` | allowed | `data\` |
+| `C:\temp\mods_evil.txt` | allowed | any directory on any drive |
+| `modsx\..\..\evil.txt` | allowed | substring match, no `mods\` involved |
+
+The guard now **normalises the path first** (separators unified, `.` dropped, `..` resolved, escaping the root
+refused) and then requires the result to start with `mods\`. Absolute paths are refused outright. Verified in game:
+four escape attempts denied with no file appearing on disk, while normal writes — including `mods\.\x.log` and
+`mods\sub\..\x.log` — still succeed.
+
+**This is a behaviour change.** A mod writing through an absolute path is now refused — *even if that absolute path
+points inside `mods\`*, which is what our own older test mod did. Point mods at relative `mods\…` paths.
+
+### Added — refusals are no longer silent
+
+A denied write used to return `nil, err` and nothing else, so the author only saw "my log file never appeared". The
+loader now logs one line per distinct reason:
+
+```
+[sandbox] denied write: D:\...\mods\hello.log  -> path escapes (absolute, or .. above the root)
+```
+
+That line is how the absolute-path behaviour change was caught in testing: the log stayed empty, and without this
+line there was no way to tell a refused write from a broken mod.
+
 ## 0.2.0 — 2026-10-22
 
 ### Fixed — solo deployment crashed the game

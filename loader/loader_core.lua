@@ -168,6 +168,39 @@ do
     local function bsl_update_noop() end
     local function bsl_shutdown_noop() end
 
+    -- 路径规范化：只接受相对路径。统一分隔符 → 吃掉 "." → 解析 ".."（越界即返回 nil）。
+    -- 绝对路径（盘符 / 反斜杠开头 / UNC）一律返回 nil：写操作只允许 mods 之下的相对路径。
+    local function normalize_relative(path)
+        if type(path) ~= "string" or path == "" then return nil end
+        if path:find("^%a:") or path:sub(1, 2) == "\\\\" or path:sub(1, 1) == "\\" then
+            return nil
+        end
+        local slashed = path:gsub("/", "\\")
+        local parts = {}
+        for seg in slashed:gmatch("[^\\]+") do
+            if seg == "." then
+                -- 无意义的当前目录段，丢弃
+            elseif seg == ".." then
+                if #parts == 0 then return nil end     -- 越过根，拒绝
+                parts[#parts] = nil
+            else
+                parts[#parts + 1] = seg
+            end
+        end
+        if #parts == 0 then return nil end
+        return table.concat(parts, "\\")
+    end
+
+    -- 被拒的写尝试只记一次（按原因去重），否则一个每帧写日志的 mod 会刷爆 loader.log。
+    -- 静默拒绝是坏事：作者只会看到"日志没写"，看不到为什么。
+    local denied_seen = {}
+    local function note_denied(path, why)
+        local key = tostring(why)
+        if denied_seen[key] then return end
+        denied_seen[key] = true
+        log("[sandbox] denied write: " .. tostring(path) .. "  -> " .. tostring(why))
+    end
+
     local function make_env(modname)
         local env = {}
         -- 标准库（允许）
@@ -204,14 +237,32 @@ do
             difftime = os.difftime,
         }
 
-        -- io：只给读文件；写操作限定在 mods 目录内
+        -- io：只给读文件；写操作限定在 mods 目录**之内**
+        --
+        -- ★ 不要退回到 path:find("mods", 1, true) 的写法。那是子串搜索，
+        --   实测可绕过（E:\DSH\_hd2mm\_work\loader\sandbox_guard_test.lua）：
+        --     mods\..\..\evil.txt   -> 通过，实际写到游戏根目录
+        --     mods\..\evil.txt      -> 通过，实际写到 data 目录
+        --     C:\temp\mods_evil.txt -> 通过，'mods' 只是别处的一个子串
+        --   正确做法是先规范化（统一分隔符、吃掉 .、解析 ..、越界即拒绝），
+        --   再判断结果**是否恰好以 mods\ 开头**。
         env.io = {
             open = function(path, mode)
                 if type(path) ~= "string" then return nil, "bad path" end
                 if mode ~= nil and type(mode) ~= "string" then return nil, "bad mode" end
                 if mode and mode:find("[wa+]") then
-                    if not path:lower():find(MODS_REL:lower(), 1, true) then
-                        return nil, "write outside mods dir denied"
+                    local norm = normalize_relative(path)
+                    if norm == nil then
+                        local why = "path escapes (absolute, or .. above the root)"
+                        note_denied(path, why)
+                        return nil, "write outside mods dir denied (" .. why .. ")"
+                    end
+                    local lower = norm:lower()
+                    local prefix = MODS_REL:lower() .. "\\"
+                    if lower:sub(1, #prefix) ~= prefix then
+                        local why = "not under " .. MODS_REL .. "\\"
+                        note_denied(path, why)
+                        return nil, "write outside mods dir denied (" .. why .. ")"
                     end
                 end
                 return io.open(path, mode)

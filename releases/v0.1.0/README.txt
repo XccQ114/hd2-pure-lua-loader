@@ -1,13 +1,14 @@
 ﻿HD2 Pure-Lua Mod Loader — prebuilt patch
 ========================================
 file    : 9ba626afa44a3aa3.patch_0 (+ .gpu_resources, .stream — both empty)
-size    : 18265 B
-sha256  : 0057C04DDB493B779A14B02DA92279CD06F4A3620E6D1E9312E567B10464E63D
+size    : 20921 B
+sha256  : E6EC2295EAA66C080483D1219508DC37B48D0951B12FD43971D14EE19C9ADFC2
 mode    : solo — the loader is the entire boot payload; no third-party content
-built   : 2026-10-22
-loader  : loader_core.lua 18065 B (sha256 597C778565D68950791951F69329261B4EAC359242F1E00AF18EDF6161F4E5BF)
+built   : 2026-10-23
+loader  : loader_core.lua 20721 B (sha256 4876BA18EBD5C4F296F38559D19E0D0F0CD910D07F663F11AF2CE2644D5BE40C)
+changes : 0.2.1 sandbox write-guard fix (see CHANGELOG.md)
 
-Verified in game on build 25988413 (2026-10-22):
+Verified in game on build 25988413:
   [host] update/shutdown hooked (prev_update=nil, prev_shutdown=nil)
   [host] init/render hooked (prev_init=nil, prev_render=nil)
   [boot] loaded 2 mod(s)

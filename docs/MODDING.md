@@ -139,9 +139,15 @@ whitelist:
 | Loader | `CowboyBingusModLoader` (see §6), `__MODNAME`, `update`, `shutdown` |
 | `_G` | points at this same sandbox table |
 
-**`io.open` rules:** reading is unrestricted; a mode containing `w`, `a` or `+` is only allowed if the path contains
-`mods` (case-insensitive). Anything else returns `nil, "write outside mods dir denied"`. So always write to
-`mods\<something>`.
+**`io.open` rules:** reading is unrestricted. For a mode containing `w`, `a` or `+`, the path is **normalised first**
+(separators unified, `.` dropped, `..` resolved) and must then resolve to something **under `mods\`**; absolute paths
+(`C:\…`, `\\server\…`, `\rooted`) are refused outright. Anything else returns
+`nil, "write outside mods dir denied …"`.
+
+That check is deliberately stricter than a substring test. An earlier version accepted any path *containing* the text
+`mods`, which let `mods\..\..\evil.txt` resolve to the game root and `C:\temp\mods_evil.txt` pass on a different
+drive. The rule is now "normalise, then require the `mods\` prefix" — `mods\sub\..\a.log` is fine, `mods\..\a.log` is
+not.
 
 **Not available at all** — anything not in the table above: `ffi`, `jit`, `require`, `package`, `module`,
 `loadstring`, `load`, `loadfile`, `dofile`, `setfenv`/`getfenv`, `os.execute`, `os.remove`, `os.exit`, `io.popen`,

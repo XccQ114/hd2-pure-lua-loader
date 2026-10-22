@@ -132,7 +132,9 @@ local peers = session and stingray.GameSession.peers(session)
 | Loader | `CowboyBingusModLoader`（见 §6）、`__MODNAME`、`update`、`shutdown` |
 | `_G` | 指向这个沙箱表本身 |
 
-**`io.open` 的规则：** 读不限；模式串含 `w`、`a` 或 `+` 时，路径里必须含 `mods`（不区分大小写）。其它一律返回 `nil, "write outside mods dir denied"`。所以要写就写 `mods\<某个文件>`。
+**`io.open` 的规则：** 读不限。当模式串含 `w`、`a` 或 `+` 时，路径会**先被规范化**（统一分隔符、丢弃 `.`、解析 `..`），然后必须落在 **`mods\` 之下**；绝对路径（`C:\…`、`\\server\…`、`\` 开头的）一律拒绝。其它情况返回 `nil, "write outside mods dir denied …"`。
+
+这个检查是**故意**比"子串匹配"更严的。早期版本只要路径里**含有** `mods` 这几个字就放行，结果 `mods\..\..\evil.txt` 能解析到游戏根目录、`C:\temp\mods_evil.txt` 能落到别的盘上。现在的规则是"先规范化，再要求 `mods\` 前缀"——`mods\sub\..\a.log` 可以，`mods\..\a.log` 不行。
 
 **完全不可用**——凡是上面表格里没有的都算：`ffi`、`jit`、`require`、`package`、`module`、`loadstring`、`load`、`loadfile`、`dofile`、`setfenv`/`getfenv`、`os.execute`、`os.remove`、`os.exit`、`io.popen`、`io.write`、`io.lines`、`io.close`、`debug`、`coroutine`、`collectgarbage`、`newproxy`。如果你的 mod 需要其中任何一个，它在这个 loader 下跑不起来——这是设计限制，不是 bug。（`loadstring` 是**故意**不给的：loader 自己编译你的 `main.lua`，而一个能继续编译 chunk 的 mod 就能绕过这个沙箱。）
 
