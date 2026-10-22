@@ -98,7 +98,12 @@ local font = "core/performance_hud/debug"
 local id = stingray.Gui.text(gui, "hello", font, 22, font,
                              stingray.Vector2(20, 20), stingray.Color(255, 255, 255, 255))
 
-local w, h = stingray.Gui.resolution(gui)
+-- **No argument.** Gui.resolution(gui) does not error — it returns garbage
+-- (measured in the same frame: resolution(gui) -> 1226853248 x 1426606976,
+--  resolution() -> 2560 x 1440). Feeding those numbers into coordinates makes
+--  Gui.text crash at helldivers2.exe+0x108732. Always sanity-check the result:
+--  if it is not a plausible screen size, skip the frame instead of drawing.
+local w, h = stingray.Gui.resolution()
 
 -- Redraw means: destroy the previous object, then call Gui.text again. Every call
 -- allocates one, including drop shadows — forgetting them leaks one per redraw.

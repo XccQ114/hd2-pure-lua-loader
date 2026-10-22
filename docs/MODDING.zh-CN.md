@@ -94,7 +94,12 @@ local font = "core/performance_hud/debug"
 local id = stingray.Gui.text(gui, "hello", font, 22, font,
                              stingray.Vector2(20, 20), stingray.Color(255, 255, 255, 255))
 
-local w, h = stingray.Gui.resolution(gui)
+-- **不传参数。** Gui.resolution(gui) 不会报错，但会返回垃圾值
+-- （同一帧实测：resolution(gui) -> 1226853248 x 1426606976，
+--   resolution()    -> 2560 x 1440）。拿这些数去算坐标会让 Gui.text
+-- 崩在 helldivers2.exe+0x108732。务必对结果做合理性检查：
+-- 不是合理的屏幕尺寸就跳过这一帧，别画。
+local w, h = stingray.Gui.resolution()
 
 -- 重绘的意思是：先销毁上一个对象，再调一次 Gui.text。
 -- 每次调用都会分配一个对象，包括阴影 —— 忘了销毁就每次重绘泄漏一个。

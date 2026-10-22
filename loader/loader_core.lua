@@ -47,6 +47,17 @@ do
         if f then f:close() end
     end
 
+    -- 日志轮转：超过 512 KB 就把当前文件改名成 loader.log.old（只留一代）。
+    -- 没有轮转的话，一个每帧报错的 mod 能把日志顶到几十 MB。
+    --
+    -- 判据用 f:seek("end") 写完后的真实位置，**不维护字节计数器**：
+    --   * 文本模式追加在 Windows 上把 "\n" 写成 CRLF，用 #text+1 每行低估一字节；
+    --   * 计数器一旦与磁盘不一致，就再也没机会对齐；
+    --   * 用真实大小则轮转失败会自动在下次重试（os.rename 失败返回 nil 而**不抛错**，
+    --     所以必须检查返回值，不然 pcall 是个空壳）。
+    -- os.remove / os.rename 已在游戏进程内实测可用且不阻塞（轮转真实发生过：
+    -- 624,000 B -> 522 B，.old 保留 624,035 B，游戏继续运行）。
+    local LOG_MAX_BYTES = 512 * 1024
 
     local function log(fmt, ...)
         local text
@@ -59,7 +70,16 @@ do
         local f = io.open(LOG_PATH, "a")
         if f then
             f:write(text .. "\n")
+            local size = f:seek("end")        -- 写完后的真实字节数（含平台行尾）
             f:close()
+            if size and size > LOG_MAX_BYTES then
+                pcall(function()
+                    os.remove(LOG_PATH .. ".old")
+                    local renamed, err = os.rename(LOG_PATH, LOG_PATH .. ".old")
+                    if not renamed then error(tostring(err)) end
+                end)
+                -- 失败就让文件继续长大；下一次 log 会再取真实大小并重试。
+            end
         end
     end
 
@@ -90,7 +110,28 @@ do
         local dirs, seen = {}, {}
         local f = io.open(root .. "\\mods.txt", "r")
         if f then
-            for line in f:lines() do
+            local first = true
+            for raw in f:lines() do
+                local line = raw
+                if first then
+                    first = false
+                    -- ★ UTF-8 BOM：记事本与 VS Code 默认可能写入。不剥掉的话第一个
+                    --   mod 名会变成 "\239\187\191hello"，永远匹配不上目录，而且
+                    --   日志里看不出任何异常（只是"没加载"）。
+                    line = line:gsub("^\239\187\191", "")
+                    -- UTF-16 清单：整文件是 UTF-16，按字节读必然是含 NUL 的乱码。
+                    -- **必须整份放弃**，不能把乱码行当 mod 名：那会把 NUL 字节写进
+                    -- loader.log，而 PowerShell 的 Get-Content / Select-String 在 NUL 处
+                    -- 截断，后面的日志全部看不见 —— 正好毁掉轮转想保住的诊断能力。
+                    if line:sub(1, 2) == "\255\254" or line:sub(1, 2) == "\254\255" then
+                        log("[scan] mods.txt 疑似 UTF-16 编码，已忽略整份清单，改用固定名兜底")
+                        dirs, seen = {}, {}
+                        break
+                    end
+                end
+                -- 注：Windows 文本模式读取已在 CRT 层把 CRLF 折成 LF，正常情况下这里
+                -- 已经不含 "\r"；留着是为了容忍被程序写坏的混合行尾，代价接近零。
+                line = line:gsub("\r$", "")
                 line = line:gsub("^%s+", ""):gsub("%s+$", "")
                 if line ~= "" and line:sub(1, 1) ~= "#" and not seen[line] then
                     seen[line] = true

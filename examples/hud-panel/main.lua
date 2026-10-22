@@ -28,7 +28,7 @@
 --     leaks one GUI text object per redraw.
 -- ============================================================================
 
-local M = { name = "hud-panel", version = "1.0.1" }
+local M = { name = "hud-panel", version = "1.0.2" }
 
 -- ---- engine tables (grab once; they are plain tables in this Lua state) ----
 local sr          = stingray
@@ -168,9 +168,17 @@ local function draw(line, main_world)
         return
     end
 
-    local ok_res, w, h = pcall(Gui.resolution, target)
-    if not ok_res or type(w) ~= "number" or type(h) ~= "number" or w <= 0 or h <= 0 then
-        say("[ui] resolution unavailable")
+    -- ★ Gui.resolution 是**无参**调用。
+    --   传 gui 进去不会报错，但会返回垃圾（实测 1226853248 x 1426606976 —— 未初始化
+    --   内存的值）。拿它算坐标会得到上千万的像素位置，再交给 Gui.text，引擎在内部
+    --   处理越界坐标时崩在 helldivers2.exe+0x108732（0xC0000005）。
+    --   实测同一帧内：resolution(gui) -> 垃圾，resolution() -> 2560x1440。
+    --   第二道防线是范围检查：宁可不画这一帧，也不要把荒唐的分辨率喂给引擎。
+    local ok_res, w, h = pcall(Gui.resolution)
+    if not ok_res or type(w) ~= "number" or type(h) ~= "number"
+       or w < 640 or h < 480 or w > 16384 or h > 16384 then
+        say(string.format("[ui] resolution unusable (ok=%s w=%s h=%s)",
+            tostring(ok_res), tostring(w), tostring(h)))
         return
     end
 

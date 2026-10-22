@@ -36,7 +36,8 @@
 | `World.load_prefab(w, name)` | 可用（prefab 实例的唯一来源） |
 | `Unit.debug_name` | 返回可读的 `#ID[<hash>]` 串——唯一稳定的身份字段 |
 | `Unit.alive`、`Unit.resource_name` | 可用（bool / IdString64） |
-| `Gui.text`、`Gui.resolution`、`Gui.set_visible`、`World.create_screen_gui` | 可用；字体 `core/performance_hud/debug` 确实以 `font` 类型存在 |
+| `Gui.text`、`Gui.set_visible`、`World.create_screen_gui` | 可用；字体 `core/performance_hud/debug` 确实以 `font` 类型存在 |
+| `Gui.resolution` | **只在无参调用时可用** —— `Gui.resolution(gui)` 不报错但返回垃圾（实测 `1226853248 x 1426606976`，而同一帧的 `Gui.resolution()` 返回 `2560 x 1440`）。把垃圾值当坐标用会让 `Gui.text` 崩在 `+0x108732` |
 | `Network.ping`、`Network.game_session`、`GameSession.peers`、`GameSession.game_session_host` | 可用；主菜单里也有 session（`peers=1`） |
 
 ### 会让进程崩溃（不要调用）

@@ -45,7 +45,8 @@ the ~1706 unenumerable units are.
 | `World.load_prefab(w, name)` | works (the only source of a prefab instance) |
 | `Unit.debug_name` | returns a readable `#ID[<hash>]` string — the only stable identity field |
 | `Unit.alive`, `Unit.resource_name` | work (bool / IdString64) |
-| `Gui.text`, `Gui.resolution`, `Gui.set_visible`, `World.create_screen_gui` | work; font `core/performance_hud/debug` exists as `font` |
+| `Gui.text`, `Gui.set_visible`, `World.create_screen_gui` | work; font `core/performance_hud/debug` exists as `font` |
+| `Gui.resolution` | works **only with no arguments** — `Gui.resolution(gui)` returns garbage without erroring (measured in one frame: `1226853248 x 1426606976`, while `Gui.resolution()` returned `2560 x 1440`). Using the garbage as coordinates crashes `Gui.text` at `+0x108732` |
 | `Network.ping`, `Network.game_session`, `GameSession.peers`, `GameSession.game_session_host` | work; a session also exists in the main menu (`peers=1`) |
 
 ### Crashes the process (do not call)

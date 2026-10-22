@@ -189,7 +189,40 @@ python McOP2fix\dump-stack.py  "%APPDATA%\Arrowhead\Helldivers2\dumps\dump-….d
 
 ---
 
-## 10. "Does this build still allow script mods at all?"
+## 10. The loader vanished after verifying game files in Steam
+
+**Symptom.** Everything worked, then one day the game starts with no `mods\loader.log` at all and no crash.
+
+**Cause.** Steam's *Verify integrity of game files* compares `data\` against the official manifest. Our
+`9ba626afa44a3aa3.patch_0` is not part of that manifest, so Steam deletes it (and, if it is being thorough, the
+`.gpu_resources` / `.stream` sidecars too). The same thing happens after some game updates.
+
+**Fix.** Re-run `tools\install.ps1`. Nothing is corrupted — the loader simply is not installed any more. Verify it
+by checking that all three files exist and that `loader.log` appears after the next launch.
+
+---
+
+## 11. Two `boot` mods: only one of them runs
+
+**Symptom.** You installed a second mod that also overrides the `boot` resource. One of the two silently stops
+working.
+
+**Cause.** This build reads **exactly one** archive slot for boot content: `data\9ba626afa44a3aa3.patch_0`. It is not
+a queue and not a stack — two `patch_0` files cannot coexist, and a payload in `patch_1`…`patch_14` is never read.
+Whoever wrote `patch_0` last wins.
+
+**Fix.** Merge them into a single payload instead of picking a winner: build with
+`--host-payload <the other mod's boot payload.lua>`, which appends the loader after the host's Lua and `pcall`-chains
+its `init` / `update` / `render` / `shutdown`. Both mods then run in the same chunk. If the host payload is not a
+plain `.lua` (it is already encoded into an archive), extract it first.
+
+Note the ordering constraint: the host payload must define `update`/`shutdown` as **globals** and must not end in a
+top-level `return` — otherwise there is nothing to chain to. See [§1](#1-game-crashes-right-after-the-loader-logs-its-first-lines)
+for the four-hook requirement.
+
+---
+
+## 12. "Does this build still allow script mods at all?"
 
 Measured answer: **yes, through this route.** `.patch` archives still load, the engine's Lua state still executes a
 `boot` payload, and `Script.load` still returns callable chunks. What died on 2026-10-20 is (a) the third-party
@@ -198,7 +231,7 @@ deployment slot and your hook set first.
 
 ---
 
-## 11. You changed the loader and want to know it still works
+## 13. You changed the loader and want to know it still works
 
 ```powershell
 # 1. syntax gate (catches Lua 5.1-only errors with zero game launches)

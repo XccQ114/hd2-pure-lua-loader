@@ -154,13 +154,35 @@ python …\dump_exc_module.py  "%APPDATA%\Arrowhead\Helldivers2\dumps\dump-….d
 
 ---
 
-## 10. "这个构建到底还允许脚本 mod 吗？"
+## 10. 在 Steam 里"验证游戏文件完整性"之后，loader 消失了
+
+**症状。** 本来一切正常，某天游戏启动后 `mods\loader.log` 完全不再出现，也没有崩溃。
+
+**原因。** Steam 的「验证游戏文件完整性」会拿 `data\` 跟官方清单比对。我们的 `9ba626afa44a3aa3.patch_0` 不在官方清单里，于是被删掉（严苛一些时连 `.gpu_resources` / `.stream` 两个 sidecar 一起删）。部分游戏更新后也会发生同样的事。
+
+**修法。** 重跑 `tools\install.ps1`。什么都没坏——只是 loader 不再处于已安装状态。装完确认三个文件都在，下次启动就会有 `loader.log`。
+
+---
+
+## 11. 两个 `boot` mod：只有一个生效
+
+**症状。** 你又装了一个同样覆盖 `boot` 资源的 mod，结果两者之一无声失效。
+
+**原因。** 本构建读 `boot` 内容时**只认一个槽位**：`data\9ba626afa44a3aa3.patch_0`。它不是队列也不是栈——两个 `patch_0` 不能共存，而放在 `patch_1`…`patch_14` 的 payload 永远不会被读取。谁最后写进 `patch_0`，谁赢。
+
+**修法。** 不要二选一，把它们合并成一个 payload：用 `--host-payload <另一个 mod 的 boot payload.lua>` 构建，loader 会追加在宿主 Lua 之后，并 `pcall` 串接它的 `init` / `update` / `render` / `shutdown`，两个 mod 就在同一个 chunk 里一起跑。若宿主 payload 不是明文 `.lua`（已经封进归档了），需要先提取出来。
+
+注意顺序约束：宿主 payload 必须把 `update`/`shutdown` 定义为**全局**，且不能以顶层 `return` 结尾——否则没有东西可串接。四钩子要求在 [§1](#1-game-crashes-right-after-the-loader-logs-its-first-lines) 里。
+
+---
+
+## 12. "这个构建到底还允许脚本 mod 吗？"
 
 实测答案：**允许，走这条路线就允许。** `.patch` 归档照样加载，引擎的 Lua 状态照样执行 `boot` payload，`Script.load` 照样返回可调用的 chunk。2026-10-20 死掉的是：(a) 第三方加载器，(b) 签名 DLL 插件加载。所以如果你在排查"Lua 是不是死了"，答案是没死——先检查你的部署槽位和钩子集合。
 
 ---
 
-## 11. 你改了 loader，想知道还能不能用
+## 13. 你改了 loader，想知道还能不能用
 
 ```powershell
 # 1. 语法闸门（零启动次数就能拦下 Lua 5.1 特有的错误）

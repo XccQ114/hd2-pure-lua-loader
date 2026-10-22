@@ -2,7 +2,33 @@
 
 All notable changes to this project. Dates are local (UTC+8) unless noted.
 
-`update` is not in this changelog? It is: 0.2.1 is the sandbox fix, 0.2.0 the four-hook fix, 0.1.0 the first release.
+`update` is not in this changelog? It is: 0.2.2 is the `Gui.resolution` fix, 0.2.1 the sandbox fix, 0.2.0 the
+four-hook fix, 0.1.0 the first release.
+
+## 0.2.2 — 2026-10-23
+
+### Fixed — `Gui.resolution` must be called with **no arguments**
+
+`Gui.resolution(gui)` does not raise an error. It returns garbage:
+
+| call | result (same process, same frame) |
+|---|---|
+| `Gui.resolution(gui)` | `1226853248 x 1426606976` |
+| `Gui.resolution()` | `2560 x 1440` |
+
+A HUD that used the first form computed coordinates around 15 million pixels and handed them to `Gui.text`, which
+crashed the game at `helldivers2.exe+0x108732` (`0xC0000005`) — reproducibly, on every launch where the panel was
+actually drawn.
+
+Why it took a while to find: **`pcall` catches nothing, because nothing is raised.** The wrong call returns
+plausible-looking types (`number`, `number`), so every defensive guard passed. And the merged deployment masked it
+entirely, so the earlier "verified in game" runs never hit it.
+
+`examples/hud-panel` now calls `Gui.resolution()` and additionally rejects implausible sizes (anything outside
+640×480 … 16384×16384) rather than drawing with them. Verified after the fix: solo + `hud-panel` draws for 30+
+seconds with no crash; before it, the process died five log lines in.
+
+**If you copied the earlier snippet, change it** — `docs/MODDING.md` shipped the wrong form for a few hours.
 
 ## 0.2.1 — 2026-10-23
 
