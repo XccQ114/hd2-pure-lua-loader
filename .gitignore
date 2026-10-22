@@ -1,0 +1,18 @@
+# build output — regenerate with: python loader/build_loader_patch.py --solo
+loader/dist/
+
+# Python
+__pycache__/
+*.py[cod]
+
+# editors / OS
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+
+# scratch files that must never be committed
+*.log
+*.dmp
+*.bak
+*.orig

@@ -1,0 +1,13 @@
+# Normalise to LF inside the repository, check out LF everywhere.
+# (Without this, a Windows clone rewrites every .md/.lua/.ps1 on first touch and
+# every diff becomes a line-ending diff.)
+* text=auto eol=lf
+
+# Never touch the binary payloads. These are shipped exactly as the game reads them;
+# a stray CRLF conversion would corrupt the archive silently.
+*.patch_0        binary
+*.patch_0.*      binary
+*.gpu_resources  binary
+*.stream         binary
+*.png            binary
+*.dmp            binary

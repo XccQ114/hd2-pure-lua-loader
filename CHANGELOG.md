@@ -1,0 +1,80 @@
+# Changelog
+
+All notable changes to this project. Dates are local (UTC+8) unless noted.
+
+## 0.2.0 — 2026-10-22
+
+### Fixed — solo deployment crashed the game
+
+**Symptom.** Building with `--solo` (loader alone as the `boot` payload) and starting the game: the loader ran and
+wrote its first two log lines, then the process died. No Lua error was logged. The game produced a crashpad dump:
+
+```
+ExceptionCode    0xC0000005 (ACCESS_VIOLATION)
+ExceptionAddress helldivers2.exe + 0x79A553
+```
+
+**Root cause.** The engine calls **four** lifecycle hooks from the `boot` Lua state — `init`, `update`, `render`,
+`shutdown` — and does not null-check them. The loader only defined `update` and `shutdown`, so the engine called a
+nil `init` and crashed in its own Lua error path (`+0x79A553` sits in the same function as the compile-failure
+crash point `+0x79A511`).
+
+This was invisible in the merged build because the third-party payload the loader was appended to occupies all four
+slots with no-ops:
+
+```lua
+local function noop() end
+init,shutdown,update,render = noop,noop,noop,noop
+```
+
+**Fix.** The loader now defines all four hooks unconditionally and `pcall`-chains any previous implementation. Mod
+loading moved from "first `update` frame" into `init`, which matches the engine lifecycle and keeps "failed to
+load" distinct from "per-frame callback errored" in the log. `render` forwards to a mod's optional `render(world)`.
+
+### Added — solo mode verified in game
+
+Both deployment modes are now measured end-to-end on build 25988413:
+
+| Mode | `prev_*` types in log | Result |
+|---|---|---|
+| solo | `prev_init=nil, prev_update=nil, prev_render=nil, prev_shutdown=nil` | 2 mods loaded, hello ran 600 frames, P2P Ping first tick, `Responding=True`, no dump |
+| merged (ArmoryForge) | all four `prev_*=function` | same, plus ArmoryForge's own log advanced |
+
+### Added — verification tooling
+
+- `loader/verify_solo_patch.py` (kept in the private work tree) — checks all 29 header/type/TOCTOU fields of a
+  built archive against the packing rules, including `0x20` = 256-byte-aligned capacity and the payload header
+  (`u32 length` + `u32 mode=2`).
+- A dump triage helper that maps `ExceptionAddress` to `module + RVA`, which is how `+0x79A553` was identified.
+
+### Verified — the examples run in game, not just on paper
+
+`examples/hud-panel` was loaded on build 25988413 and drew continuously (`[ui] drew: HUD-PANEL …`, 59 lines over
+27 s, no crash, `Responding=True`). Getting there exposed a trap worth knowing about:
+
+> **`stingray.Vector2` is a callable *table* (metatable `__call`), not a function** — `stingray.Color` is a real
+> function. A guard written as `type(Vector2) ~= "function"` therefore rejects Vector2, and the HUD silently draws
+> nothing while logging "missing". Test callability (function **or** table-with-`__call`), never `type()` alone.
+
+The panel also confirmed the measured drawing signatures: `World.create_screen_gui(world, "scale", 1, 1)`,
+`Gui.text(gui, text, font, size, material, Vector2(x, y), Color(a, r, g, b))`, font `core/performance_hud/debug`,
+size 22, colour channels 0–255.
+
+### Changed
+
+- `[host] update/shutdown hooked (...)` is kept verbatim for compatibility with existing tooling; a second line
+  `[host] init/render hooked (...)` was added rather than changing the first.
+
+## 0.1.0 — 2026-10-22
+
+Initial working release.
+
+- Pure-Lua loader appended to the `boot` resource of `data\9ba626afa44a3aa3.patch_0`, no DLL and no signature.
+- Archive writer reproduces the original third-party payload **byte-for-byte** (797,815 B) as a self-check, plus a
+  `luac -p` syntax gate before writing anything.
+- BSL compatibility shim: `CowboyBingusModLoader.api = 1`, `version = 17`, `open_log(name)`, a wrappable
+  `_G.update`/`_G.shutdown` in the mod sandbox.
+- Directory loading from `mods\mods.txt` plus fixed-name fallback probe of `mods\01` … `mods\20`
+  (`io.popen`/`os.execute` block the main thread and are not used anywhere).
+- `setfenv` sandbox per mod, `pcall` isolation, auto-disable after 10 errors.
+- Verified with a third-party mod (P2P Ping by shock233, unmodified) rendering its HUD in game.
