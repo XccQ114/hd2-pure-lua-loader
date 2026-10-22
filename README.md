@@ -175,6 +175,28 @@ conflating them is exactly the mistake this project already had to correct once.
 
 ---
 
+## Provenance and AI disclosure
+
+The code, the documentation and most of the experimental design here were drafted by an **AI coding agent**
+(DSH, on DeepSeek) running on the author's machine at the author's request. Every game launch was made on that same
+machine, with the author authorising and reviewing each command. Saying that plainly is more useful than hiding it:
+it tells you what to discount.
+
+What it does **not** mean:
+
+- no figure on this page comes from a model's recall. Every measurement was produced by a run against a retail
+  install of build 25988413 and is traceable to a log line, a crash dump, or a file that still exists;
+- where the text reasons past a direct observation, it says so. The four such passages in
+  [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) are listed up front, by name;
+- crash addresses were computed as `ExceptionAddress − module base` from minidumps, not guessed;
+- this project has already had to correct its own claims twice after re-reading its logs — a payload-size figure
+  that conflated three different lengths, and a theory of the signature gate that one counter-example killed. Both
+  corrections are recorded in [CHANGELOG.md](CHANGELOG.md).
+
+Weight the evidence by the logs, not by the prose.
+
+---
+
 ## Licence
 
 MIT — see [LICENSE](LICENSE). Do what you want; no warranty.
