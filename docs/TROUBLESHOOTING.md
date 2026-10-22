@@ -189,16 +189,26 @@ python McOP2fix\dump-stack.py  "%APPDATA%\Arrowhead\Helldivers2\dumps\dump-….d
 
 ---
 
-## 10. The loader vanished after verifying game files in Steam
+## 10. Steam's "verify integrity of game files" and the loader
 
-**Symptom.** Everything worked, then one day the game starts with no `mods\loader.log` at all and no crash.
+**Measured 2026-10-23: it does *not* remove the loader.** Someone will tell you otherwise; we assumed so
+ourselves until we ran it.
 
-**Cause.** Steam's *Verify integrity of game files* compares `data\` against the official manifest. Our
-`9ba626afa44a3aa3.patch_0` is not part of that manifest, so Steam deletes it (and, if it is being thorough, the
-`.gpu_resources` / `.stream` sidecars too). The same thing happens after some game updates.
+Steam only validates files that appear in its own manifest. A file it does not know about is left alone. We
+snapshotted the full `bin\` and `data\` trees before and after a complete verification run:
 
-**Fix.** Re-run `tools\install.ps1`. Nothing is corrupted — the loader simply is not installed any more. Verify it
-by checking that all three files exist and that `loader.log` appears after the next launch.
+| | before | after |
+|---|---|---|
+| `bin\` files | 45 | 45, all SHA256 identical |
+| `data\` files | 99 | 99 |
+| `data\9ba626afa44a3aa3.patch_0` | 821,753 B | present, same SHA256 |
+| `bin\hd2probe\` (our own subdirectory) | 19 files | 19 files |
+
+**What does remove it: a game update.** When the build changes, Steam replaces the `data/` files it manages, and
+in any case every address in this project's crash table is build-specific — a new build invalidates the loader
+whether or not the file survives.
+
+So: verifying files is safe. Updating the game is the thing to plan for.
 
 ---
 
