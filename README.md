@@ -177,7 +177,8 @@ conflating them is exactly the mistake this project already had to correct once.
 
 ## Licence
 
-MIT. Do what you want; no warranty.
+MIT — see [LICENSE](LICENSE). Do what you want; no warranty.
 
-Not affiliated with Arrowhead Game Studios or Sony Interactive Entertainment. HELLDIVERS is a trademark of Sony
-Interactive Entertainment. Use at your own discretion.
+This project contains no game assets and redistributes no third-party mod payload; the shipped patch holds only the
+loader's own Lua source. Not affiliated with Arrowhead Game Studios or Sony Interactive Entertainment. HELLDIVERS is
+a trademark of Sony Interactive Entertainment. Use at your own discretion.

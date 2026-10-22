@@ -152,6 +152,6 @@ python loader\build_loader_patch.py --solo --host-payload path\to\host_payload.l
 
 ## 许可
 
-MIT。随便用，不提供任何担保。
+MIT —— 见 [LICENSE](LICENSE)。随便用，不提供任何担保。
 
-与 Arrowhead Game Studios 及 Sony Interactive Entertainment 无关。HELLDIVERS 是 Sony Interactive Entertainment 的商标。请自行斟酌使用。
+本项目不含任何游戏资产，也不再分发任何第三方 mod payload；随包发布的补丁里只有 loader 自己的 Lua 源码。与 Arrowhead Game Studios 及 Sony Interactive Entertainment 无关。HELLDIVERS 是 Sony Interactive Entertainment 的商标。请自行斟酌使用。
