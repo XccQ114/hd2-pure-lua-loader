@@ -232,7 +232,34 @@ for the four-hook requirement.
 
 ---
 
-## 12. "Does this build still allow script mods at all?"
+## 12. Deploying through HD2MM wiped patches I had installed by hand
+
+**Symptom.** You deploy something in HD2MM, and other mods you had copied into `data\` by hand vanish — no warning,
+and nothing in the Recycle Bin.
+
+**Cause.** HD2MM's *Deploy* makes `data\` match **the set of enabled mods**: it removes every `9ba626*.patch_*` file
+first, then lays down only what the enabled mods provide. Anything it does not manage goes with them. That is by
+design, not a bug — but it is destructive to hand-installed content.
+
+**Measured 2026-10-23:** enabling only this loader removed **36 patch files / 314 MB** that had been placed by hand —
+`patch_1.gpu_resources` (121 MB), `patch_9.gpu_resources` (85 MB), `patch_8.stream` (67 MB), `patch_4` (30.5 MB) and
+the rest. The Recycle Bin held none of them and HD2MM's `Temp` directory was empty.
+
+**What to back up — the patch family, not all of `data\`.** Most of `data\` is official and Steam restores it; the
+irreplaceable part is the patch files:
+
+```powershell
+$bk = "E:\hd2mm-backup\$(Get-Date -Format yyyyMMdd-HHmm)"
+New-Item -ItemType Directory -Force -Path $bk | Out-Null
+Copy-Item "<game>\data\9ba626*.patch_*" $bk -Force
+```
+
+Restoring is the reverse copy. Mods that HD2MM itself manages need no such backup — their original ZIPs stay in
+HD2MM's `Mods` directory and can simply be redeployed.
+
+---
+
+## 13. "Does this build still allow script mods at all?"
 
 Measured answer: **yes, through this route.** `.patch` archives still load, the engine's Lua state still executes a
 `boot` payload, and `Script.load` still returns callable chunks. What died on 2026-10-20 is (a) the third-party
@@ -241,7 +268,7 @@ deployment slot and your hook set first.
 
 ---
 
-## 13. You changed the loader and want to know it still works
+## 14. You changed the loader and want to know it still works
 
 ```powershell
 # 1. syntax gate (catches Lua 5.1-only errors with zero game launches)

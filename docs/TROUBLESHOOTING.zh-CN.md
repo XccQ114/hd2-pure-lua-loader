@@ -185,13 +185,33 @@ Steam 只校验它自己清单里有的文件。它不认识的文件，它不�
 
 ---
 
-## 12. "这个构建到底还允许脚本 mod 吗？"
+## 12. 通过 HD2MM 部署之后，我手工装的 patch 全没了
+
+**症状。** 在 HD2MM 里部署了某个 mod，之前手工复制进 `data\` 的其它 mod 全部消失——没有提示，回收站里也没有。
+
+**原因。** HD2MM 的 **Deploy** 会让 `data\` 与**已启用 mod 的集合**保持一致：它先把所有 `9ba626*.patch_*` 文件删掉，然后只铺已启用 mod 提供的那几个。它不管理的文件会一并消失。这是设计如此，不是 bug——但对**手工装的**内容是破坏性的。
+
+**2026-10-23 实测：** 只启用本 loader 就删掉了 **36 个 patch 文件 / 314 MB** 手工放置的内容——`patch_1.gpu_resources`（121 MB）、`patch_9.gpu_resources`（85 MB）、`patch_8.stream`（67 MB）、`patch_4`（30.5 MB）等。回收站里一个都没有，HD2MM 的 `Temp` 目录也是空的。
+
+**该备份什么——patch 家族，不是整个 `data\`。** `data\` 里大部分是官方文件，Steam 能恢复；真正不可替代的是 patch 文件：
+
+```powershell
+$bk = "E:\hd2mm-backup\$(Get-Date -Format yyyyMMdd-HHmm)"
+New-Item -ItemType Directory -Force -Path $bk | Out-Null
+Copy-Item "<游戏目录>\data\9ba626*.patch_*" $bk -Force
+```
+
+恢复就是反向复制。HD2MM 自己管理的 mod 不需要这样备份——它们的原始 ZIP 还在 HD2MM 的 `Mods` 目录里，重新部署即可。
+
+---
+
+## 13. "这个构建到底还允许脚本 mod 吗？"
 
 实测答案：**允许，走这条路线就允许。** `.patch` 归档照样加载，引擎的 Lua 状态照样执行 `boot` payload，`Script.load` 照样返回可调用的 chunk。2026-10-20 死掉的是：(a) 第三方加载器，(b) 签名 DLL 插件加载。所以如果你在排查"Lua 是不是死了"，答案是没死——先检查你的部署槽位和钩子集合。
 
 ---
 
-## 13. 你改了 loader，想知道还能不能用
+## 14. 你改了 loader，想知道还能不能用
 
 ```powershell
 # 1. 语法闸门（零启动次数就能拦下 Lua 5.1 特有的错误）
