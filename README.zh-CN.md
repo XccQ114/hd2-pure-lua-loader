@@ -144,7 +144,7 @@ python loader\build_loader_patch.py --solo --probe-resource
 python loader\build_loader_patch.py --solo --host-payload path\to\host_payload.lua --verify-original path\to\original.patch_0
 ```
 
-产物写到 `loader\dist\`。**`releases\v0.1.0\` 里附了一份预构建的 solo patch**，所以安装完全不需要 Python。
+产物写到 `loader\dist\`。**`releases\current\` 里附了一份预构建的 solo patch**，所以安装完全不需要 Python。
 
 所有路径都以脚本自身位置为基准解析。第三方 host payload **不随仓库分发**——自备，或者用 `--solo`。若系统里有 `luac`，会被当作语法闸门（用 `LUAC` 环境变量指定）；没有也能构建，只是会明确告诉你跳过了。64 位的 `luac` 解析**源码**没问题——它只解析不了游戏自己的字节码 dump（那是 32 位 `size_t`）。
 

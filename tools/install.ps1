@@ -14,7 +14,7 @@
 
 .PARAMETER Build
     Which patch to install: 'solo' (loader only, default) or 'merged' (loader appended after a
-    third-party host payload). 'solo' uses the prebuilt patch in releases\v0.1.0\; 'merged' always
+    third-party host payload). 'solo' uses the prebuilt patch in releases\current\; 'merged' always
     builds locally, because the host payload is not redistributed with this repo.
 
 .PARAMETER HostPayload
@@ -94,7 +94,7 @@ if ($proc) { Fail "The game is running (PID $($proc.Id)). Close it completely, t
 # ---------------------------------------------------------------- locate the patch
 $patch = $null
 if ($Build -eq 'solo') {
-    $patch = Join-Path $RepoRoot "releases\v0.1.0\$PatchName"
+    $patch = Join-Path $RepoRoot "releases\current\$PatchName"
 } else {
     # merged = loader appended after a third-party host payload. That payload is NOT
     # redistributed with this repo, so a merged build always happens locally.

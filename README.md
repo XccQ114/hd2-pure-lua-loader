@@ -163,7 +163,7 @@ python loader\build_loader_patch.py --solo --probe-resource
 python loader\build_loader_patch.py --solo --host-payload path\to\host_payload.lua --verify-original path\to\original.patch_0
 ```
 
-Output goes to `loader\dist\`. A **prebuilt solo patch ships in `releases\v0.1.0\`**, so installing does not require
+Output goes to `loader\dist\`. A **prebuilt solo patch ships in `releases\current\`**, so installing does not require
 Python at all.
 
 Everything is resolved relative to the script's own location. The third-party host payload is **not** redistributed —
