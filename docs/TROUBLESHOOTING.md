@@ -297,3 +297,26 @@ Expected solo log (no third-party host payload present):
 
 `prev_*` being `nil` is correct for a solo build and `function` for a merged build — that is the cheapest way to tell
 which one you are actually running.
+
+---
+
+## 15. A second patch in `data\` is silently ignored
+
+The engine merges `data\<bundle>.patch_N` **in contiguous order**: once the chain has a gap, every patch after the gap
+is not read at all — the files are on disk, the hashes match, and the game behaves as if they were not there.
+
+Measured on this build (another group's controlled experiment): with `patch_1` and `patch_2` deleted and only
+`patch_3` present, six probe mods came back `absent` (0 found / 0 loaded / 6 absent); with a contiguous
+`patch_0..patch_3` the same probes loaded (3 / 3 / 3).
+
+What to do:
+
+- Keep the chain contiguous from `patch_0` upward. Never "tidy up" by deleting a middle slot.
+- If you only run this loader you do **not** need extra slots at all — one `patch_0` is the whole install. HD2MM's
+  Deploy actually helps here: it clears every other `9ba626*.patch_*` and leaves a single contiguous `patch_0` (the
+  cost of that behaviour is #12).
+- If you stack several hand-installed patches, check the numbering before blaming the mod.
+
+*Note:* that measurement is one observation by another group (gap state 0/0/6 vs contiguous 3/3/3); we have not
+re-run it ourselves. The mechanism matches everything else we know about `patch_N` loading — the engine reads the
+chain at startup, in order (see `docs/COMPATIBILITY.md` §2).

@@ -11,7 +11,9 @@ Marked as inference in this document: `statically linked` Lua (we only observed 
 `WinVerifyTrust` *location* (we counted occurrences, we did not trace a call), the four-bucket RVA pattern, and what
 the ~1706 unenumerable units are.
 
-- **Game build:** 25988413 (Steam, retail, Easy Anti-Cheat active)
+- **Game build:** **26088801** (Steam, retail, Easy Anti-Cheat active — the 2026-10-22 hotfix 7.2.1). Most of this
+  document was first measured on **25988413** (the 2026-10-20 update); on 2026-10-23 the boot anchor, the four hooks,
+  `World.units`, `Gui.resolution` and the crash table were **re-checked on 26088801 and still hold**.
 - **Lua:** 5.1.4, `sizeof(size_t)` = **4** (32-bit), `sizeof(int)` = 4, `integral` = 0, `num` = 8 — the last four are
   fields of the `string.dump` bytecode header, read off three dumps that agreed with each other.
 - **Lua appears to be statically linked into `data/game/game.dll`** — this build ships **no** `bin/lua51.dll` at all
@@ -53,13 +55,14 @@ the ~1706 unenumerable units are.
 
 | Call | Module + RVA | Exception |
 |---|---|---|
-| `World.units(world)` | — (no dump) | process dies |
+| `World.units(w)` — the call itself is safe; **dereferencing `units[i]` for i ≥ 2** | `helldivers2.exe+0x3E5654` | `0xC0000005`. *Measured 2026-10-23 on 26088801:* the call returns a table and does not crash — 62 units on the ship, 2 290 in another world, **17 172 in a mission** — but reading `world_position` of `units[2]` kills the process even though `Unit.alive` returned `true`. Same code family as `0x3C07D9` / `0x3D203F` / `0x3E7CA3` / `0x3EB121` |
 | `UnitComponent.unit(component, entity)` | `helldivers2.exe+0x3EB121` | `0xC0000005`, `rdi=0` null deref |
 | `World.unit_by_id(world, id)` | `helldivers2.exe+0x3C07D9` | `0xC0000005` |
 | `Unit.has_mesh` / `Unit.is_a` | `helldivers2.exe+0x3E7CA3` | `0xC0000005` |
 | `Application.set_resource_override(type, name, nil)` | `helldivers2.exe+0x3D203F` | `0xC0000005` |
 | `Application.can_get(x)` (single argument) | — (no dump) | process dies |
 | a `boot` payload that does **not** define `init` or `render` | `helldivers2.exe+0x79A553` | `0xC0000005` |
+| `Gui.resolution(nil, nil)` | `helldivers2.exe+0x3BBB14` | `0xC0000005`. *Measured 2026-10-23:* `Gui.resolution()` with **no** arguments is safe and returns the real `2560×1440` |
 
 Two patterns worth remembering:
 
@@ -104,10 +107,21 @@ capabilities.
   `alive == false` for 0 of them.
 - The remaining ~1706 units are **not enumerable through any channel we tried**. *Inference:* they are
   runtime-spawned (enemies, projectiles, vehicles) — we never enumerated them directly, we only observed that the
-  three channels crash. All three crash: `World.units`, `UnitComponent.unit`, `World.unit_by_id`.
-- **Positions are unreadable.** `Unit.world_position` is always `Vector3(0,0,0)`; `Unit.world_pose` returns a
-  `Matrix4x4` whose components are `1e-42 / -nan / …` — integers reinterpreted as floats, i.e. uninitialised memory.
-  `Unit.id` → `nil`. `Unit.name_hash` → a garbage string (do not use it).
+  three channels crash. Two of them still do: `UnitComponent.unit`, `World.unit_by_id`. **`World.units` does not**
+  (re-measured 2026-10-23 on 26088801): the call returns a table — 62 units on the ship, 2 290 in another world — but
+  dereferencing `units[i]` for i ≥ 2 kills the process, and `Unit.alive` returning `true` does not protect you.
+- **The position data is uninitialised memory, not coordinates.** `units[1]` is the same object in every world
+  (`resource_name` = `0x465f4895f3dc98d1`). Across **seven samples** — ship, a 2 290-unit world, and a real mission
+  (17 172 units / 1 234 levels) — `Unit.world_position` returned `Vector3(1,1,1)`, `Vector3(0,0,0)`, and once
+  `Vector3(-1.02749043e-34, 7.91733632e-43, 9.80908925e-45)`. The same call on the same handle in the same scene
+  giving different values is what uninitialised memory looks like, not what a position looks like.
+  `Unit.world_pose` exposes only 4 components to Lua (`pose[1..4]` == `pose.x/.y/.z/.w`; `pose[5..16]` → `nil`;
+  `translation` / `position` / `row1..4` / `m11` / `m44` → `nil`; no methods at all), and those 4 are themselves
+  garbage. `Unit.id` → `nil`. `Unit.name_hash` → a garbage string (do not use it).
+  **A third party reports a plausible coordinate (`Vector3(110.699356, -944.186157, -313.060883)`) from a mission;
+  with the evidence above, the likely explanation is another snapshot of the same uninitialised memory** — a value
+  that merely *looks* like a position. This is not an accusation of fabrication; it is a statement that the API's
+  return value cannot be trusted.
 
 **Conclusion:** aim/ESP/distance mods are not reachable from this Lua surface. Anything that needs a specific
 dynamic unit's position is a native-layer problem.
@@ -209,5 +223,8 @@ This is not part of the loader. It is recorded here because every "why not just 
 - Whether any *other* engine `lua` resource is loadable at runtime (name space is closed, §4).
 - Whether `render` is called on every frame in all game states (it is defined because a missing hook crashes; mods
   should not depend on its cadence).
-- Behaviour on builds other than 25988413. Nothing here transfers automatically; the RVAs and the hook set are
-  build-specific.
+- Behaviour on builds other than **26088801** / 25988413. Nothing here transfers automatically; the RVAs and the
+  hook set are build-specific.
+- Whether **any** engine path can return a real unit position. Every route we tried either gives uninitialised data
+  (`Unit.world_position` / `Unit.world_pose`, §3) or kills the process (`units[i]` for i ≥ 2 at `+0x3E5654`,
+  `UnitComponent.unit`, `World.unit_by_id`). A usable position likely needs the native layer.

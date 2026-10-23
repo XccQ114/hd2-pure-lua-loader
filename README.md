@@ -2,7 +2,8 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-A **pure-Lua mod loader** for HELLDIVERS 2 on the current Steam build (**25988413**). It loads mods from
+A **pure-Lua mod loader** for HELLDIVERS 2 on the current Steam build (**26088801**; everything was first measured on
+25988413 and re-checked on 26088801 on 2026-10-23). It loads mods from
 `<game>\mods\` into the game's own Lua 5.1 state through a `boot` resource override — no native DLL, no code
 signature, no anti-cheat interaction, no Bingus Shared Loader.
 
@@ -22,7 +23,7 @@ signature, no anti-cheat interaction, no Bingus Shared Loader.
 | ✅ Works | ❌ Does not work |
 |---|---|
 | Load pure-Lua mods (`init` / `update` / `render` / `shutdown`) | **No FFI** — cannot read or write game memory |
-| BSL compatibility shim: `CowboyBingusModLoader.api = 1`, `open_log()`, `_G.update` wrapping | Cannot read unit positions (`world_position` is always `0,0,0` on this build) |
+| BSL compatibility shim: `CowboyBingusModLoader.api = 1`, `open_log()`, `_G.update` wrapping | Cannot read unit positions (`world_position` came back `0,0,0` / `1,1,1` on every sample we took — see `docs/COMPATIBILITY.md` §3) |
 | In-game GUI text (`Gui.text`), rectangles (`Gui.rect` — used by a working third-party payload), hotkeys | Cannot change gameplay values (damage, ammo, cooldowns) |
 | `stingray.Network.*`, `GameSession.*` queries | Cannot load FFI-based mods (that is ~all of the BSL ecosystem) |
 | Directory loading + fixed-name fallback (`mods\01`…`mods\20`) | Cannot bypass the engine's plugin signature gate (error `577`) |

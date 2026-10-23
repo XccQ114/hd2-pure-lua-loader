@@ -114,8 +114,11 @@ local peers = session and stingray.GameSession.peers(session)
 > **`stingray.Vector2` 是可调用的 *table***（元表 `__call`），而 `stingray.Color` 是真函数。把守卫写成 `type(Vector2) == "function"` 会把它判死，你的 HUD 会安安静静什么都不画。请检测"可调用性"——`examples/hud-panel` 里有现成的辅助函数。
 
 **以下调用一个都不要碰**——它们杀的是进程，不只是你的 mod：
-`World.units`、`World.unit_by_id`、`UnitComponent.unit`、`Unit.has_mesh`、`Unit.is_a`、
-单参数形式的 `Application.can_get(x)`、以及 `Application.set_resource_override(t, n, nil)`。
+`World.unit_by_id`、`UnitComponent.unit`、`Unit.has_mesh`、`Unit.is_a`、
+单参数形式的 `Application.can_get(x)`、`Application.set_resource_override(t, n, nil)`、
+以及 `Gui.resolution(nil, nil)`。
+
+一条补充（2026-10-23 在 build 26088801 上复测）：**`World.units(w)` 调用本身是安全的** —— 它返回一个 table（舰船 62 个、另一个世界 2 290 个）。杀进程的是解引用 `units[i]`（i ≥ 2），而且 `Unit.alive` 返回 `true` 也保不住你。请把返回的表当成"只有第一个元素能用"。
 
 ---
 

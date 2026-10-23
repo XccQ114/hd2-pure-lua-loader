@@ -120,8 +120,13 @@ local peers = session and stingray.GameSession.peers(session)
 > `examples/hud-panel` has the helper.
 
 **Do not** call any of these — they kill the process, not just your mod:
-`World.units`, `World.unit_by_id`, `UnitComponent.unit`, `Unit.has_mesh`, `Unit.is_a`,
-`Application.can_get(x)` with one argument, `Application.set_resource_override(t, n, nil)`.
+`World.unit_by_id`, `UnitComponent.unit`, `Unit.has_mesh`, `Unit.is_a`,
+`Application.can_get(x)` with one argument, `Application.set_resource_override(t, n, nil)`,
+`Gui.resolution(nil, nil)`.
+
+One nuance (added 2026-10-23, re-measured on build 26088801): **`World.units(w)` itself is safe** — it returns a
+table (62 units on the ship, 2 290 in another world). What kills the process is dereferencing `units[i]` for
+i ≥ 2, and `Unit.alive` returning `true` does not protect you. Treat the returned table as "first element only".
 
 ---
 

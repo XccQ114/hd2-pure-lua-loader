@@ -8,7 +8,7 @@
 
 本文标注为推断的有：Lua 的"静态链接"（我们只观测到不存在独立 DLL）、`WinVerifyTrust` 的**位置**（我们数了出现次数，没有跟踪调用）、四个 RVA 的分桶规律、以及那约 1706 个无法枚举的单位到底是什么。
 
-- **游戏构建：** 25988413（Steam 零售版，Easy Anti-Cheat 生效）
+- **游戏构建：** **26088801**（Steam 零售版，Easy Anti-Cheat 生效 —— 2026-10-22 的 7.2.1 热修）。本文大部分内容最初在 **25988413**（2026-10-20 那次更新）上测得；2026-10-23 已把 boot 锚点、四钩子、`World.units`、`Gui.resolution` 与崩点表**在 26088801 上复测，结论仍然成立**。
 - **Lua：** 5.1.4，`sizeof(size_t)` = **4**（32 位），`sizeof(int)` = 4，`integral` = 0，`num` = 8 —— 后四项是 `string.dump` 字节码头里的字段，从三份互相一致的 dump 中读出。
 - **Lua 看起来是静态链接进 `data/game/game.dll` 的** —— 本构建**完全没有** `bin/lua51.dll`（旧构建 25480438 带一个，469,080 B）。*推断：*我们观测到的是"这个 DLL 不存在"，而不是链接关系本身。
 - **签名 / 脚本 mod 门禁：** 字符串 `WinVerifyTrust` 在 `bin/helldivers2.exe` 里出现 **1 次**（约 `+0x14979B8`），在 `data/game/game.dll` 里出现 **0 次**。*推断：*因此签名校验跑在宿主 exe 里，而不是引擎 DLL 里。我们**没有**检查反作弊服务自己的二进制，所以对它不作任何断言。
@@ -44,13 +44,14 @@
 
 | 调用 | 模块 + RVA | 异常 |
 |---|---|---|
-| `World.units(world)` | ——（无 dump） | 进程直接死 |
+| `World.units(w)` —— 调用本身安全；**解引用 `units[i]`（i ≥ 2）** | `helldivers2.exe+0x3E5654` | `0xC0000005`。*2026-10-23 在 26088801 上实测：* 调用返回 table、不崩 —— 舰船 62 个、另一个世界 2 290 个、**任务里 17 172 个** —— 但读 `units[2]` 的 `world_position` 会杀死进程，且 `Unit.alive` 返回 `true` 也照崩。与 `0x3C07D9` / `0x3D203F` / `0x3E7CA3` / `0x3EB121` 同属一段代码 |
 | `UnitComponent.unit(component, entity)` | `helldivers2.exe+0x3EB121` | `0xC0000005`，`rdi=0` 空指针解引用 |
 | `World.unit_by_id(world, id)` | `helldivers2.exe+0x3C07D9` | `0xC0000005` |
 | `Unit.has_mesh` / `Unit.is_a` | `helldivers2.exe+0x3E7CA3` | `0xC0000005` |
 | `Application.set_resource_override(type, name, nil)` | `helldivers2.exe+0x3D203F` | `0xC0000005` |
 | `Application.can_get(x)`（单参数） | ——（无 dump） | 进程直接死 |
 | 未定义 `init` 或 `render` 的 `boot` payload | `helldivers2.exe+0x79A553` | `0xC0000005` |
+| `Gui.resolution(nil, nil)` | `helldivers2.exe+0x3BBB14` | `0xC0000005`。*2026-10-23 实测：* **无参** `Gui.resolution()` 安全，返回真实的 `2560×1440` |
 
 两条值得记住的规律：
 
@@ -85,8 +86,8 @@
 - `Application.worlds()` → 11 个 world。主 world 在局内报告 `num_units = 2303`（probe13 的值；更早一次探针在同一场景录到 2307 —— 这个数字逐帧浮动，请当作"约 2.3k"）。
 - `World.levels(main_world)` → 一个 `Level` userdata；`Level.units(level)` → **597** 个 unit，不崩。
 - 那 597 个是**关卡的静态内容**（舰船 / 场景的模型部件）：109 种不同资源 id，`num_meshes` 分布 1–9，`alive == false` 的有 0 个。
-- 剩下约 1706 个**通过我们试过的任何通道都无法枚举**。*推断：*它们是运行时生成的（敌人、投射物、载具）—— 我们从来没有直接枚举到它们，只观测到三条通道都会崩。三条通道：`World.units`、`UnitComponent.unit`、`World.unit_by_id`。
-- **坐标读不出来。** `Unit.world_position` 恒为 `Vector3(0,0,0)`；`Unit.world_pose` 返回 `Matrix4x4`，但分量是 `1e-42 / -nan / …`——整数被当浮点解释的无效位模式，典型未初始化内存。`Unit.id` → `nil`。`Unit.name_hash` → 乱码字符串（不要用）。
+- 剩下约 1706 个**通过我们试过的任何通道都无法枚举**。*推断：*它们是运行时生成的（敌人、投射物、载具）—— 我们从来没有直接枚举到它们，只观测到三条通道都会崩。**其中两条确实会崩：`UnitComponent.unit`、`World.unit_by_id`；`World.units` 不再算在内**（2026-10-23 在 26088801 上复测：调用返回 table，舰船 62 个、另一个世界 2 290 个，不崩），但解引用 `units[i]`（i ≥ 2）会杀死进程，且 `Unit.alive` 返回 `true` 也保不住。
+- **位置数据是未初始化内存，不是坐标。** `units[1]` 在每个世界里都是同一个对象（`resource_name` = `0x465f4895f3dc98d1`）。**七次采样**（舰船、一个 2 290 units 的世界、以及一次真任务 17 172 units / 1 234 levels）中，`Unit.world_position` 分别返回过 `Vector3(1,1,1)`、`Vector3(0,0,0)`，还有一次是 `Vector3(-1.02749043e-34, 7.91733632e-43, 9.80908925e-45)`。同一个 handle、同一个场景、同一个调用给出不同结果 —— 这是未初始化内存的样子，不是坐标的样子。`Unit.world_pose` 在 Lua 侧只暴露 4 个分量（`pose[1..4]` == `pose.x/.y/.z/.w`；`pose[5..16]` → `nil`；`translation` / `position` / `row1..4` / `m11` / `m44` → `nil`；没有任何方法），而那 4 个本身就是垃圾。`Unit.id` → `nil`。`Unit.name_hash` → 乱码字符串（不要用）。**第三方从任务世界里报过一个看起来很合理的坐标（`Vector3(110.699356, -944.186157, -313.060883)`）；按上面的证据，最可能的解释是它也是同一段未初始化内存的另一次快照** —— 一个只是"看起来像"位置的值。这不是指控谁造假，而是说这个 API 的返回值不可信。
 
 **结论：** 自瞄 / ESP / 距离判定这类 mod 从这个 Lua 面触不到。任何需要"某个动态单位的位置"的功能，都是 native 层的问题。
 
@@ -164,4 +165,5 @@ loader 的职责止于"你的 Lua 模块能被执行、并且有完整的引擎�
 
 - 运行时是否还能加载**别的**引擎 `lua` 资源（名字空间已封，见 §4）。
 - `render` 是否在所有游戏状态下都逐帧被调用（它被定义是因为缺了会崩；mod 不应依赖它的调用频率）。
-- 25988413 之外的构建上的行为。这里的任何结论都不会自动迁移；RVA 与钩子集合都是随构建变化的。
+- **26088801** / 25988413 之外的构建上的行为。这里的任何结论都不会自动迁移；RVA 与钩子集合都是随构建变化的。
+- **有没有**任何引擎通道能给出真实的单位位置。我们试过的每一条，要么给未初始化数据（`Unit.world_position` / `Unit.world_pose`，见 §3），要么直接杀死进程（`units[i]`（i ≥ 2）崩在 `+0x3E5654`、`UnitComponent.unit`、`World.unit_by_id`）。能用的大概只有 native 层。

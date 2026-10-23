@@ -4,7 +4,7 @@
 
 > 本文是 [README.md](README.md) 的中文对照版，与英文版逐节对应。两者内容一致；如有出入，以英文版为准。
 
-一个面向当前 Steam 构建（**25988413**）的《绝地潜兵 2》（HELLDIVERS 2）**纯 Lua Mod Loader**。它通过覆盖 `boot` 资源，把 `<game>\mods\` 下的 mod 加载进游戏**自己的 Lua 5.1 状态**里——不需要 native DLL、不需要代码签名、不碰反作弊、也不依赖 Bingus Shared Loader。
+一个面向当前 Steam 构建（**26088801**，最初在 25988413 上验证、2026-10-23 在新构建上复测通过）的《绝地潜兵 2》（HELLDIVERS 2）**纯 Lua Mod Loader**。它通过覆盖 `boot` 资源，把 `<game>\mods\` 下的 mod 加载进游戏**自己的 Lua 5.1 状态**里——不需要 native DLL、不需要代码签名、不碰反作弊、也不依赖 Bingus Shared Loader。
 
 > **状态：0.2.2 —— 两种部署形态均已在游戏内验证通过。** 在构建 25988413 上端到端验证了两种配置：**solo**（loader 单独构成整个 `boot` payload）与 **merge**（追加在第三方 host payload，例如 ArmoryForge 之后）。两种情况下，一个为 Bingus Shared Loader 编写的真实第三方 mod（shock233 的 P2P Ping）都被加载并画出了 HUD，随包附带的 `examples/hud-panel` 也连续绘制正常。实测证据（含**做不到**的部分）见 [docs/COMPATIBILITY.zh-CN.md](docs/COMPATIBILITY.zh-CN.md)。
 >
@@ -17,7 +17,7 @@
 | ✅ 能 | ❌ 不能 |
 |---|---|
 | 加载纯 Lua mod（`init` / `update` / `render` / `shutdown`） | **没有 FFI** —— 读写不了游戏内存 |
-| BSL 兼容层：`CowboyBingusModLoader.api = 1`、`open_log()`、可包装 `_G.update` | 读不到单位坐标（本构建上 `world_position` 恒为 `0,0,0`） |
+| BSL 兼容层：`CowboyBingusModLoader.api = 1`、`open_log()`、可包装 `_G.update` | 读不到单位坐标（我们取的每个样本上 `world_position` 都是 `0,0,0` / `1,1,1`，见 `docs/COMPATIBILITY.zh-CN.md` §3） |
 | 游戏内 GUI 文本（`Gui.text`）、矩形（`Gui.rect`，一个可用的第三方 payload 在用）、热键 | 改不了 gameplay 数值（伤害、弹药、冷却） |
 | `stingray.Network.*`、`GameSession.*` 查询 | 加载不了 FFI 型 mod（而那几乎是整个 BSL 生态） |
 | 目录加载 + 固定名兜底（`mods\01`…`mods\20`） | 绕不过引擎的插件签名门禁（错误码 `577`） |
