@@ -8,12 +8,14 @@ Where the official Stingray Lua API reference disagrees with what this build doe
 has already bitten this project twice.
 
 Marked as inference in this document: `statically linked` Lua (we only observed that no separate DLL exists), the
-`WinVerifyTrust` *location* (we counted occurrences, we did not trace a call), the four-bucket RVA pattern, and what
+`WinVerifyTrust` *location* (we counted occurrences, we did not trace a call), the RVA bucketing pattern, and what
 the ~1706 unenumerable units are.
 
 - **Game build:** **26088801** (Steam, retail, Easy Anti-Cheat active — the 2026-10-22 hotfix 7.2.1). Most of this
-  document was first measured on **25988413** (the 2026-10-20 update); on 2026-10-23 the boot anchor, the four hooks,
-  `World.units`, `Gui.resolution` and the crash table were **re-checked on 26088801 and still hold**.
+  document was first measured on **25988413** (the 2026-10-20 update). On 2026-10-23 everything was re-checked on
+  26088801: the boot anchor, the four hooks and the RVA layout **still hold**, and **three claims were corrected** —
+  `World.units` does not crash on the call (only on walking the result), positions are uninitialised memory rather
+  than always `0,0,0`, and `Gui.resolution(nil, nil)` is a crash we had not recorded.
 - **Lua:** 5.1.4, `sizeof(size_t)` = **4** (32-bit), `sizeof(int)` = 4, `integral` = 0, `num` = 8 — the last four are
   fields of the `string.dump` bytecode header, read off three dumps that agreed with each other.
 - **Lua appears to be statically linked into `data/game/game.dll`** — this build ships **no** `bin/lua51.dll` at all
@@ -32,7 +34,7 @@ the ~1706 unenumerable units are.
 
 | Call | Observed result |
 |---|---|
-| `Application.worlds()` | table of 11 worlds |
+| `Application.worlds()` | a table of worlds — **8 on the ship, 11 in a world-switch state, 9 in a mission**. Both the count and the main world's index move with the scene (see §3) |
 | `Application.make_hash(name)` | `make_hash("boot")` → `"f476df93691895fa"`, matches the resource id used in patch archives |
 | `Application.can_get(type, name)` | 2-argument form is safe; returns bool. The `type` string is not validated |
 | `Application.set_resource_override(type, name, other)` | works; see §5 |
@@ -40,7 +42,7 @@ the ~1706 unenumerable units are.
 | `stingray.Script.exists(name)` / `Script.load(name)` | `load` returns a **callable chunk**; executing it gives full globals (`io`, `os` available) |
 | `string.dump(fn)` | works; produces bytecode with 32-bit `size_t` |
 | `World.entities(world)` | table of 369 real Entity userdata (`ud:[Entity "name" id:version]`) |
-| `World.num_units(world)` | 2303 in a mission (probe13), 62 on the ship |
+| `World.num_units(world)` | 62 on the ship; 2290–2314 in a world-switch state (`num_levels` = 1); **17172 in a real mission** (`num_levels` = 1234, measured 2026-10-23). `num_units` alone does not say which one you are in — `num_levels` does |
 | `World.levels(world)` / `Level.units(level)` | see §3 |
 | `World.unit_by_name(w, name)` | returns `nil` for a missing name — no crash |
 | `World.units_by_resource(w, res)` | returns a 0-length table for missing/empty — no crash |
@@ -53,25 +55,32 @@ the ~1706 unenumerable units are.
 
 ### Crashes the process (do not call)
 
+One row is an exception and is marked as such: `World.units(w)` **is safe to call** — what crashes is dereferencing
+its result. Everything else in this table crashes on the call itself.
+
 | Call | Module + RVA | Exception |
 |---|---|---|
-| `World.units(w)` — the call itself is safe; **dereferencing `units[i]` for i ≥ 2** | `helldivers2.exe+0x3E5654` | `0xC0000005`. *Measured 2026-10-23 on 26088801:* the call returns a table and does not crash — 62 units on the ship, 2 290 in another world, **17 172 in a mission** — but reading `world_position` of `units[2]` kills the process even though `Unit.alive` returned `true`. Same code family as `0x3C07D9` / `0x3D203F` / `0x3E7CA3` / `0x3EB121` |
+| `World.units(w)` — **safe to call**; dereferencing `units[i]` for i ≥ 2 | `helldivers2.exe+0x3E5654` (one dump) | `0xC0000005`. *Measured 2026-10-23 on 26088801:* the call returns a table and does not crash — 62 units on the ship, 2290 in a world-switch state, **17172 in a mission** — but reading `world_position` of `units[2]` kills the process even though `Unit.alive` returned `true`. The RVA is from the mission-world crash; an earlier crash on the ship was not dump-analysed. *Inference:* likely the same code family as `0x3C07D9` / `0x3D203F` / `0x3E7CA3` / `0x3EB121` |
 | `UnitComponent.unit(component, entity)` | `helldivers2.exe+0x3EB121` | `0xC0000005`, `rdi=0` null deref |
 | `World.unit_by_id(world, id)` | `helldivers2.exe+0x3C07D9` | `0xC0000005` |
 | `Unit.has_mesh` / `Unit.is_a` | `helldivers2.exe+0x3E7CA3` | `0xC0000005` |
 | `Application.set_resource_override(type, name, nil)` | `helldivers2.exe+0x3D203F` | `0xC0000005` |
 | `Application.can_get(x)` (single argument) | — (no dump) | process dies |
-| a `boot` payload that does **not** define `init` or `render` | `helldivers2.exe+0x79A553` | `0xC0000005` |
+| a `boot` payload that does **not** define `init` or `render` | `helldivers2.exe+0x79A553` | `0xC0000005`. This is the host's Lua hand-off failure path — a missing hook is **one way** onto it, not the only one (see the note below) |
 | `Gui.resolution(nil, nil)` | `helldivers2.exe+0x3BBB14` | `0xC0000005`. *Measured 2026-10-23:* `Gui.resolution()` with **no** arguments is safe and returns the real `2560×1440` |
 
 Two patterns worth remembering:
 
-- The four RVAs `0x3C07D9`, `0x3D203F`, `0x3E7CA3`, `0x3EB121` all sit inside `0x3C0000–0x3F0000`. *Inference:* that
-  is the same "look up the table, then dereference the result" code, which never null-checks. The rule of thumb that
-  follows (**anything by id is a landmine, anything by name/resource got null-checks**) is a pattern we observed
-  across ~10 calls, not a guarantee.
-- `+0x79A553` (missing hook) and `+0x79A511` (invalid Lua chunk) are 0x42 bytes apart — the host's Lua error path.
-  A crash there means "the host could not hand off to Lua", not "your Lua threw".
+- Five of the seven RVAs (`0x3C07D9`, `0x3D203F`, `0x3E5654`, `0x3E7CA3`, `0x3EB121`) sit inside
+  `0x3C0000–0x3F0000`. *Inference:* that is the same "look up the table, then dereference the result" code, which
+  never null-checks. **`Gui.resolution(nil, nil)` at `0x3BBB14` sits outside that range**, so not every crash comes
+  from the same block. The rule of thumb that follows (**anything by id is a landmine, anything by name/resource got
+  null-checks**) is a pattern we observed across ~10 calls, not a guarantee.
+- `+0x79A553` and `+0x79A511` (invalid Lua chunk) are 0x42 bytes apart — the host's Lua hand-off error path. A crash
+  there means "the host could not hand off to Lua", not "your Lua threw". **A missing `init`/`render` is one way onto
+  that path, not the only one**: on 2026-10-23 a boot payload that defined all four hooks still crashed at
+  `+0x79A553`, while a minimal payload on the same machine ran fine — so the trigger is in the payload, and what
+  exactly trips the host's error path is still unknown.
 
 ### Documented but unusable
 
@@ -100,24 +109,30 @@ capabilities.
 
 ## 3. Units — what you can and cannot enumerate
 
-- `Application.worlds()` → 11 worlds. The main world reports `num_units = 2303` in a mission (probe13; an earlier
-  probe recorded 2307 in the same scene — the value moves frame to frame, so treat it as "about 2.3 k").
+- `Application.worlds()` → the count **and** the index of the main world both move with the scene: **8 on the ship**
+  (main is the last entry), **11 in a world-switch state**, **9 in a mission** (main is `[1]`). Filter by
+  `num_units`/`num_levels`; never by index.
+- `num_units` alone does not tell you where you are: 62 on the ship, 2290–2314 in a world-switch state (both with
+  `num_levels` = 1), and **17172 in a real mission** (`num_levels` = 1234). **`num_levels` is the reliable mission
+  signal** — the earlier note that read "2303 in a mission" came from a frame where `num_levels` was 1.
 - `World.levels(main_world)` → a `Level` userdata; `Level.units(level)` → **597** units, no crash.
 - Those 597 are **static level content** (ship/scene mesh parts): 109 distinct resource ids, `num_meshes` 1–9,
   `alive == false` for 0 of them.
 - The remaining ~1706 units are **not enumerable through any channel we tried**. *Inference:* they are
   runtime-spawned (enemies, projectiles, vehicles) — we never enumerated them directly, we only observed that the
   three channels crash. Two of them still do: `UnitComponent.unit`, `World.unit_by_id`. **`World.units` does not**
-  (re-measured 2026-10-23 on 26088801): the call returns a table — 62 units on the ship, 2 290 in another world — but
-  dereferencing `units[i]` for i ≥ 2 kills the process, and `Unit.alive` returning `true` does not protect you.
+  (re-measured 2026-10-23 on 26088801): the call returns a table — 62 units on the ship, 2290 in a world-switch
+  state — but dereferencing `units[i]` for i ≥ 2 kills the process, and `Unit.alive` returning `true` does not
+  protect you.
 - **The position data is uninitialised memory, not coordinates.** `units[1]` is the same object in every world
-  (`resource_name` = `0x465f4895f3dc98d1`). Across **seven samples** — ship, a 2 290-unit world, and a real mission
-  (17 172 units / 1 234 levels) — `Unit.world_position` returned `Vector3(1,1,1)`, `Vector3(0,0,0)`, and once
+  (`resource_name` = `0x465f4895f3dc98d1`). Across every sample we took — ship, a world-switch state, and a real
+  mission (17172 units / 1234 levels), five of them archived as logs — `Unit.world_position` came back as
+  `Vector3(1,1,1)`, `Vector3(0,0,0)`, and once
   `Vector3(-1.02749043e-34, 7.91733632e-43, 9.80908925e-45)`. The same call on the same handle in the same scene
   giving different values is what uninitialised memory looks like, not what a position looks like.
-  `Unit.world_pose` exposes only 4 components to Lua (`pose[1..4]` == `pose.x/.y/.z/.w`; `pose[5..16]` → `nil`;
-  `translation` / `position` / `row1..4` / `m11` / `m44` → `nil`; no methods at all), and those 4 are themselves
-  garbage. `Unit.id` → `nil`. `Unit.name_hash` → a garbage string (do not use it).
+  `Unit.world_pose` exposes only 4 components to Lua (`pose[1..4]` equals `pose.x`/`.y`/`.z`/`.w` by value;
+  `pose[5..16]` → `nil`; `translation` / `position` / `row1..4` / `m11` / `m44` → `nil`; no methods at all), and
+  those 4 are themselves garbage. `Unit.id` → `nil`. `Unit.name_hash` → a garbage string (do not use it).
   **A third party reports a plausible coordinate (`Vector3(110.699356, -944.186157, -313.060883)`) from a mission;
   with the evidence above, the likely explanation is another snapshot of the same uninitialised memory** — a value
   that merely *looks* like a position. This is not an accusation of fabrication; it is a statement that the API's

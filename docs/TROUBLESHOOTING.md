@@ -272,7 +272,7 @@ deployment slot and your hook set first.
 
 ```powershell
 # 1. syntax gate (catches Lua 5.1-only errors with zero game launches)
-E:\DSH\_hd2mm\_work\lua51\luac5.1.exe -p loader\loader_core.lua
+luac5.1 -p loader\loader_core.lua
 
 # 2. build; --verify also rebuilds the reference payload and requires byte equality
 python loader\build_loader_patch.py --solo --verify
@@ -305,9 +305,9 @@ which one you are actually running.
 The engine merges `data\<bundle>.patch_N` **in contiguous order**: once the chain has a gap, every patch after the gap
 is not read at all — the files are on disk, the hashes match, and the game behaves as if they were not there.
 
-Measured on this build (another group's controlled experiment): with `patch_1` and `patch_2` deleted and only
-`patch_3` present, six probe mods came back `absent` (0 found / 0 loaded / 6 absent); with a contiguous
-`patch_0..patch_3` the same probes loaded (3 / 3 / 3).
+Measured on **25988413** by another group: with `patch_1` and `patch_2` deleted and only `patch_3` present, six
+probe mods came back `absent` (0 found / 0 loaded / 6 absent); with a contiguous `patch_0..patch_3` the same probes
+loaded (3 / 3 / 3).
 
 What to do:
 

@@ -118,7 +118,7 @@ local peers = session and stingray.GameSession.peers(session)
 单参数形式的 `Application.can_get(x)`、`Application.set_resource_override(t, n, nil)`、
 以及 `Gui.resolution(nil, nil)`。
 
-一条补充（2026-10-23 在 build 26088801 上复测）：**`World.units(w)` 调用本身是安全的** —— 它返回一个 table（舰船 62 个、另一个世界 2 290 个）。杀进程的是解引用 `units[i]`（i ≥ 2），而且 `Unit.alive` 返回 `true` 也保不住你。请把返回的表当成"只有第一个元素能用"。
+一条补充（2026-10-23 在 build 26088801 上复测）：**`World.units(w)` 调用本身是安全的** —— 它返回一个 table（舰船 62 个、世界切换态 2290 个、任务里 17172 个）。杀进程的是解引用 `units[i]`（i ≥ 2），而且 `Unit.alive` 返回 `true` 也保不住你。请把返回的表当成"只有第一个元素能用"。
 
 ---
 

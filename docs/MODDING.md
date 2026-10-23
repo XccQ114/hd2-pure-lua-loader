@@ -125,8 +125,9 @@ local peers = session and stingray.GameSession.peers(session)
 `Gui.resolution(nil, nil)`.
 
 One nuance (added 2026-10-23, re-measured on build 26088801): **`World.units(w)` itself is safe** — it returns a
-table (62 units on the ship, 2 290 in another world). What kills the process is dereferencing `units[i]` for
-i ≥ 2, and `Unit.alive` returning `true` does not protect you. Treat the returned table as "first element only".
+table (62 units on the ship, 2290 in a world-switch state, 17172 in a mission). What kills the process is
+dereferencing `units[i]` for i ≥ 2, and `Unit.alive` returning `true` does not protect you. Treat the returned
+table as "first element only".
 
 ---
 
